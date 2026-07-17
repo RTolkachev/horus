@@ -5,8 +5,9 @@
 // inside the engine package. The SQL text lives behind these interfaces;
 // nothing outside internal/dbdriver/* ever sees a statement.
 //
-// internal/app constructs one Driver per target database and hands each
-// component only the facet it is allowed to hold:
+// internal/dbdriver/dbbuilder constructs one Driver per target database
+// (it alone names engine packages); internal/app hands each component
+// only the facet it is allowed to hold:
 //
 //	Inspector  inventory
 //	Querier    boundary (MaxIDBefore), executor (RowsAbove guard)
@@ -31,7 +32,7 @@ import (
 // treat it as a clean refusal ("another horus is running"), not a failure.
 var ErrLockHeld = errors.New("dbdriver: maintenance lock held by another horus instance")
 
-// Driver is the full engine port. Only internal/app holds one whole;
+// Driver is the full engine port. dbbuilder builds it, internal/app holds it;
 // every other component receives a single facet.
 type Driver interface {
 	Inspector
@@ -120,7 +121,9 @@ type Locker interface {
 // and is therefore typed. Never point Meta at a target table.
 type Meta interface {
 	// EnsureMetaSchema creates the horus schema and its tables if they do
-	// not exist. Idempotent; called once at app construction.
+	// not exist. Idempotent. The init command is its only caller — no
+	// other command runs DDL it did not announce, and only init needs
+	// CREATE privileges.
 	EnsureMetaSchema(ctx context.Context) error
 
 	MetaExec(ctx context.Context, stmt string, args ...any) error
