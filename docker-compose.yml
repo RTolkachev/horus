@@ -11,6 +11,9 @@ services:
       - "${MYSQL_PORT:-3307}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+      # synthetic dev/test fixtures (NOT production schema); runs only
+      # on an empty volume, so reseeding = `make db-reset`
+      - ./testdata/dbinit:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-phorus"]
       interval: 2s
