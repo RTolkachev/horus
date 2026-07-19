@@ -15,8 +15,9 @@ db-up: ## start mysql and wait until healthy
 db-down: ## stop mysql, keep data
 	docker compose down
 
-db-reset: ## stop mysql and wipe data (fresh instance on next db-up)
+db-reset: ## wipe data and start a fresh instance
 	docker compose down -v
+	$(MAKE) db-up
 
 db-shell: ## mysql client on the dev database
 	docker exec -it horus-mysql mysql -uhorus -phorus horus_test
