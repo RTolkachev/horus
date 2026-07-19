@@ -77,13 +77,25 @@ defaults:
   granularity: month
   horizon: 3
   retention: 12m
+  strategy:
+    type: id
+    column: id
+    step: 1000000
 database:
   - name: horus_test
     defaults:
       granularity: week
+      strategy:
+        type: id
+        column: seq
+        step: 500000
     table:
       - name: events
         horizon: 6
+        strategy:
+          type: id
+          column: event_id
+          step: 5000000
       - name: audit_log
   - name: billing
     table:
@@ -108,6 +120,11 @@ database:
 	if got.Defaults.Retention == nil || *got.Defaults.Retention != "12m" {
 		t.Errorf("Defaults.Retention = %v, want 12m", deref(got.Defaults.Retention))
 	}
+	// strategy holds only value fields (no pointers), so the whole block
+	// compares with == against a struct literal — no field-by-field checks.
+	if want := (strategy{Type: "id", Column: "id", Step: 1000000}); got.Defaults.Strategy != want {
+		t.Errorf("Defaults.Strategy = %+v, want %+v", got.Defaults.Strategy, want)
+	}
 
 	// Two entries: the multi-database file is the core config design —
 	// this is the assertion that pins it.
@@ -125,6 +142,9 @@ database:
 	if db.Defaults.Granularity == nil || *db.Defaults.Granularity != "week" {
 		t.Errorf("Database[0].Defaults.Granularity = %v, want week", deref(db.Defaults.Granularity))
 	}
+	if want := (strategy{Type: "id", Column: "seq", Step: 500000}); db.Defaults.Strategy != want {
+		t.Errorf("Database[0].Defaults.Strategy = %+v, want %+v", db.Defaults.Strategy, want)
+	}
 
 	if len(db.Table) != 2 {
 		t.Fatalf("len(Database[0].Table) = %d, want 2", len(db.Table))
@@ -136,6 +156,9 @@ database:
 	if events.Horizon == nil || *events.Horizon != 6 {
 		t.Errorf("Table[0].Horizon = %v, want 6", deref(events.Horizon))
 	}
+	if want := (strategy{Type: "id", Column: "event_id", Step: 5000000}); events.Strategy != want {
+		t.Errorf("Table[0].Strategy = %+v, want %+v", events.Strategy, want)
+	}
 	// Load does not merge defaults: a key absent in the file must stay
 	// nil, or the merge step could never tell "unset" from "set". When
 	// parse grows merging, these assertions are the ones that change.
@@ -146,6 +169,11 @@ database:
 	if audit.Granularity != nil || audit.Horizon != nil || audit.Retention != nil {
 		t.Errorf("Table[1] = %v/%v/%v, want all nil (nothing set in file)",
 			deref(audit.Granularity), deref(audit.Horizon), deref(audit.Retention))
+	}
+	// Strategy is a value, not a pointer: absent in YAML means the zero
+	// struct — indistinguishable from an explicitly empty block.
+	if audit.Strategy != (strategy{}) {
+		t.Errorf("Table[1].Strategy = %+v, want zero value (nothing set in file)", audit.Strategy)
 	}
 }
 

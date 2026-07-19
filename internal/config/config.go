@@ -13,6 +13,12 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
+type strategy struct {
+	Type   string `yaml:"type"`
+	Column string `yaml:"column"`
+	Step   int    `yaml:"step"`
+}
+
 type Config struct {
 	DB       []database `yaml:"database"`
 	Defaults table      `yaml:"defaults"`
@@ -25,10 +31,11 @@ type database struct {
 }
 
 type table struct {
-	Name        string  `yaml:"name"`
-	Granularity *string `yaml:"granularity"`
-	Horizon     *int    `yaml:"horizon"`
-	Retention   *string `yaml:"retention"`
+	Name        string   `yaml:"name"`
+	Strategy    strategy `yaml:"strategy"`
+	Granularity *string  `yaml:"granularity"`
+	Horizon     *int     `yaml:"horizon"`
+	Retention   *string  `yaml:"retention"`
 }
 
 func Load(path string) (Config, error) {
