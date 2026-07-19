@@ -40,25 +40,15 @@ func (b *DriverBuilder) DSN(dsn string) *DriverBuilder {
 	return b
 }
 
-// Engine overrides scheme inference ("mysql"; "postgres" is future).
-func (b *DriverBuilder) Engine(name string) *DriverBuilder {
-	b.engine = name
-	return b
-}
-
 func (b *DriverBuilder) Build() (Driver, error) {
-	engine := b.engine
-	if engine == "" {
-		if scheme, _, ok := strings.Cut(b.dsn, "://"); ok {
-			engine = scheme
-		} else {
-			engine = "mysql"
-		}
+	engine, dsn, ok := strings.Cut(b.dsn, "://")
+	if !ok {
+		return nil, fmt.Errorf("dbbuilder: DSN must include an engine scheme, e.g. mysql://user:pass@tcp(host:port)/db")
 	}
 	switch engine {
 	case "mysql":
-		return mysql.New(strings.TrimPrefix(b.dsn, "mysql://"))
+		return mysql.New(dsn)
 	default:
-		return nil, fmt.Errorf("dbbuilder: unsupported engine %q", engine)
+		return nil, fmt.Errorf("dbbuilder: unsupported engine %q (supported: mysql)", engine)
 	}
 }

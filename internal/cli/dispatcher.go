@@ -15,6 +15,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -22,54 +23,24 @@ import (
 	"github.com/RTolkachev/horus/internal/app"
 )
 
-const usage = `usage: horus <command> [flags]
-
-commands:
-  init      create horus's own schema and tables (needs CREATE privilege; run once)
-  analyze   show partition state of configured tables (read-only)
-  plan      show what horus would change, without changing it
-  run       apply pending changes (the cron entry point)
-  onboard   generate a partitioning script for an unpartitioned table
-
-flags:
-  --dsn     database DSN (default: $HORUS_DSN)
-`
-
-// Run dispatches args (without the program name) and returns the process
-// exit code.
 func Run(ctx context.Context, args []string) int {
-	if len(args) == 0 {
-		fmt.Fprint(os.Stderr, usage)
-		return 1
-	}
-	cmd, rest := args[0], args[1:]
-
-	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
-	dsn := fs.String("dsn", os.Getenv("HORUS_DSN"), "database DSN")
-	if err := fs.Parse(rest); err != nil {
-		return 1
-	}
-	if *dsn == "" {
-		fmt.Fprintln(os.Stderr, "horus: no DSN: pass --dsn or set HORUS_DSN")
-		return 1
-	}
-
-	var err error
-	switch cmd {
-	case "init":
-		err = app.Init(ctx, *dsn)
-		if err == nil {
-			fmt.Println("horus meta schema ready (horus.journal, horus.stats)")
-		}
-	case "analyze", "plan", "run", "onboard":
-		err = fmt.Errorf("%s: not implemented yet", cmd)
-	default:
-		fmt.Fprintf(os.Stderr, "horus: unknown command %q\n\n%s", cmd, usage)
-		return 1
-	}
-
+	spec, err := Parse(args, os.Getenv, os.Stderr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "horus %s: %v\n", cmd, err)
+		if errors.Is(err, flag.ErrHelp) {
+			return 0 // user asked for help and got it
+		}
+		fmt.Fprintf(os.Stderr, "horus: %v\n", err)
+		return 1
+	}
+
+	switch spec.Command {
+	case "init":
+		err = app.Init(ctx, spec.DSN)
+	default:
+		err = fmt.Errorf("%s: not implemented yet", spec.Command)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "horus %s: %v\n", spec.Command, err)
 		return 1
 	}
 	return 0
