@@ -1,0 +1,38 @@
+# Horus config for the local docker-compose sandbox — the databases and
+# tables here are the synthetic ones seeded by testdata/dbinit
+# (`make db-up` to start, `make db-reset` to reseed).
+#
+# One file, many databases: at runtime horus connects via its DSN, asks
+# the engine which database it landed in, and selects the matching entry
+# below. No matching entry is a hard error — a wrong DSN can never
+# silently manage the wrong tables.
+
+defaults:
+  # strategy defines what one partition IS. It inherits atomically
+  # (defaults -> database -> table): a table that writes its own block
+  # restates all of it, so every present block is self-describing.
+  strategy:
+    type: id     # fixed id-width RANGE partitions on the auto-increment PK
+    column: id   # always declared, never inferred from the schema
+    step: 100    # ids per partition; sandbox tables hold 1000 rows -> ~10 partitions
+  # horizon counts empty partitions kept pre-created ahead of MAX(id) —
+  # splitting an empty pmax is a metadata-only operation, so staying
+  # ahead is what keeps partition maintenance cheap.
+  horizon: 3
+  # retention omitted = keep every partition forever. When set, it is
+  # the number of partitions to keep; older ones get dropped.
+
+database:
+  - name: horus_test
+    table:
+      - name: events
+      - name: audit_log
+  - name: billing
+    table:
+      - name: invoices
+        # fewer, larger partitions for this table; full block restated
+        # because strategy never merges field-wise
+        strategy:
+          type: id
+          column: id
+          step: 500
