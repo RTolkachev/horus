@@ -11,9 +11,10 @@ import (
 	"github.com/RTolkachev/horus/internal/dbdriver/dbbuilder"
 )
 
-// Init provisions horus's own storage (schema + journal + stats tables).
-// The one command that needs CREATE privileges; everything else runs with
-// less.
+// Init creates horus's own tables (journal, stats) inside the horus
+// database, which must already exist - a DBA provisions it out-of-band,
+// so Init needs only CREATE TABLE on that schema. Idempotent; the one
+// command that needs any CREATE privilege.
 func Init(ctx context.Context, dsn string) error {
 	drv, err := dbbuilder.NewDriver().DSN(dsn).Build()
 	if err != nil {

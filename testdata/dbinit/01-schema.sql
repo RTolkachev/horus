@@ -9,11 +9,19 @@
 -- existing volume skips them entirely - `make db-reset` is the way to
 -- re-run schema + seed from scratch.
 --
--- These run as root, so we can create a second database and grant it to
--- the app user (compose only creates horus_test itself).
+-- These run as root, so we can create the extra databases and grant them
+-- to the app user (compose only creates horus_test itself).
 
 CREATE DATABASE IF NOT EXISTS billing;
 GRANT ALL PRIVILEGES ON billing.* TO 'horus'@'%';
+
+-- horus's own meta database, provisioned out-of-band exactly as a DBA
+-- would: `horus init` assumes it exists and only creates tables inside
+-- it (least privilege - no CREATE DATABASE grant needed by the app
+-- user). Full rights here are legitimate: horus owns this schema. The
+-- client databases above stay the tool's read/structural-alter targets.
+CREATE DATABASE IF NOT EXISTS horus;
+GRANT ALL PRIVILEGES ON horus.* TO 'horus'@'%';
 
 -- Tables mirror the fixtures in internal/config tests: horus_test has
 -- events + audit_log, billing has invoices. All are id-strategy

@@ -2,12 +2,18 @@
 // default) without touching the process: env is a closure over a test
 // map, output goes to a bytes.Buffer. Nothing global is read or
 // mutated, so every subtest could run in parallel.
+//
+// RunSpec carries a map now, so specs are compared with
+// reflect.DeepEqual, not ==. Convention: Parse always allocates Flags,
+// so a command with no extras expects an EMPTY map, never nil -
+// DeepEqual treats those as different.
 package cli
 
 import (
 	"bytes"
 	"errors"
 	"flag"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -25,35 +31,69 @@ func TestParse(t *testing.T) {
 		name    string
 		args    []string
 		env     map[string]string
-		want    RunSpec // compared with == (RunSpec is all value fields)
-		wantErr string  // substring; empty = expect success
+		want    RunSpec
+		wantErr string // substring; empty = expect success
 	}{
 		{
 			name: "flag DSN wins over env",
-			args: []string{"analyze", "--dsn", dsn},
+			args: []string{"plan", "--dsn", dsn},
 			env:  map[string]string{"HORUS_DSN": "mysql://env-loses"},
-			want: RunSpec{Command: "analyze", DSN: dsn, ConfigPath: "horus.yaml"},
+			want: RunSpec{Command: "plan", DSN: dsn, ConfigPath: "horus.yaml", Flags: map[string]any{}},
 		},
 		{
 			name: "env supplies DSN when flag absent",
-			args: []string{"analyze"},
+			args: []string{"plan"},
 			env:  map[string]string{"HORUS_DSN": dsn},
-			want: RunSpec{Command: "analyze", DSN: dsn, ConfigPath: "horus.yaml"},
+			want: RunSpec{Command: "plan", DSN: dsn, ConfigPath: "horus.yaml", Flags: map[string]any{}},
 		},
 		{
 			name:    "no DSN anywhere",
-			args:    []string{"analyze"},
+			args:    []string{"plan"},
 			wantErr: "no DSN",
 		},
 		{
 			name: "config flag overrides default path",
 			args: []string{"plan", "--dsn", dsn, "--config", "prod.yaml"},
-			want: RunSpec{Command: "plan", DSN: dsn, ConfigPath: "prod.yaml"},
+			want: RunSpec{Command: "plan", DSN: dsn, ConfigPath: "prod.yaml", Flags: map[string]any{}},
 		},
 		{
+			name: "analyze one table",
+			args: []string{"analyze", "--dsn", dsn, "--table", "events"},
+			want: RunSpec{Command: "analyze", DSN: dsn, ConfigPath: "horus.yaml", Mode: "table",
+				Flags: map[string]any{"table": "events"}},
+		},
+		{
+			// The map holds the parsed, typed value: int64 straight from
+			// the Int64 flag, no string round-trip.
+			name: "analyze survey by minrows",
+			args: []string{"analyze", "--dsn", dsn, "--minrows", "1000"},
+			want: RunSpec{Command: "analyze", DSN: dsn, ConfigPath: "horus.yaml", Mode: "survey",
+				Flags: map[string]any{"minrows": int64(1000)}},
+		},
+		{
+			name: "analyze configured tables",
+			args: []string{"analyze", "--dsn", dsn, "--configured"},
+			want: RunSpec{Command: "analyze", DSN: dsn, ConfigPath: "horus.yaml", Mode: "configured",
+				Flags: map[string]any{"configured": true}},
+		},
+		{
+			// record is a modifier, not a selection - it rides along with
+			// any mode and never influences Mode itself.
 			name: "analyze accepts record",
-			args: []string{"analyze", "--dsn", dsn, "--record"},
-			want: RunSpec{Command: "analyze", DSN: dsn, ConfigPath: "horus.yaml", Record: true},
+			args: []string{"analyze", "--dsn", dsn, "--table", "events", "--record"},
+			want: RunSpec{Command: "analyze", DSN: dsn, ConfigPath: "horus.yaml", Mode: "table",
+				Flags: map[string]any{"table": "events", "record": true}},
+		},
+		{
+			// No default survey: analyze must be told what to look at.
+			name:    "analyze needs a selection",
+			args:    []string{"analyze", "--dsn", dsn},
+			wantErr: "exactly one",
+		},
+		{
+			name:    "analyze rejects two selections",
+			args:    []string{"analyze", "--dsn", dsn, "--table", "events", "--minrows", "1000"},
+			wantErr: "exactly one",
 		},
 		{
 			// Per-command vocabulary: the flag exists on analyze only,
@@ -75,7 +115,8 @@ func TestParse(t *testing.T) {
 		{
 			name: "onboard takes the table as positional arg",
 			args: []string{"onboard", "--dsn", dsn, "events"},
-			want: RunSpec{Command: "onboard", DSN: dsn, ConfigPath: "horus.yaml", Table: "events"},
+			want: RunSpec{Command: "onboard", DSN: dsn, ConfigPath: "horus.yaml",
+				Flags: map[string]any{"table": "events"}},
 		},
 		{
 			name:    "onboard without a table",
@@ -92,7 +133,7 @@ func TestParse(t *testing.T) {
 			// after the positional would be silently swallowed into
 			// fs.Args() - rejecting extras keeps that mistake loud.
 			name:    "stray positional args rejected",
-			args:    []string{"analyze", "--dsn", dsn, "events"},
+			args:    []string{"analyze", "--dsn", dsn, "--table", "events", "stray"},
 			wantErr: "takes no arguments",
 		},
 	}
@@ -114,7 +155,7 @@ func TestParse(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Parse(%q) unexpected error: %v", tt.args, err)
 			}
-			if got != tt.want {
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Parse(%q)\n got  %+v\n want %+v", tt.args, got, tt.want)
 			}
 		})

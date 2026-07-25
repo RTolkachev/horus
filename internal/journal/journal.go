@@ -1,7 +1,9 @@
 // Package journal is the append-only history of what actually happened -
-// the receipt, not the shopping list. Lives in a `horus` schema inside the
-// target database (survives host loss; visible to any future second
-// instance). Write side is used only by the executor; read side feeds the
+// the receipt, not the shopping list. Lives in the dedicated `horus`
+// database on the same server, provisioned out-of-band by a DBA (survives
+// host loss; visible to any future second instance; horus owns that
+// schema and never writes client data).
+// Write side is used only by the executor; read side feeds the
 // planner (history) and the run command (pending half-finished plan to
 // resume before replanning).
 //

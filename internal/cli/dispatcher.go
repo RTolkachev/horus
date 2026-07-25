@@ -1,8 +1,11 @@
 // dispatcher.go: maps the command word (init, analyze, plan, run,
 // onboard) to its handler. Owns the shared lifecycle around every
-// command: parse flags, construct the app, map errors to exit codes
-// (0 = clean, 1 = error, 2 = changes pending). Handlers stay thin - all
-// real logic lives in the packages internal/app wires together.
+// command: parse, load config for the commands that declare they need
+// it, call the app entry point, hand the returned data to render, and
+// map errors to exit codes (0 = clean, 1 = error, 2 = changes pending).
+// Handlers stay thin - routing only (analyze's handler switches on
+// spec.Mode to pick its app entry point); all real logic lives in
+// internal/app, all printing in render.
 //
 // onboard is a pure generator: converting an unpartitioned table is a
 // blocking rebuild, so Horus produces the complete ALTER (boundaries
@@ -21,6 +24,7 @@ import (
 	"os"
 
 	"github.com/RTolkachev/horus/internal/app"
+	"github.com/RTolkachev/horus/internal/config"
 )
 
 func Run(ctx context.Context, args []string) int {
@@ -33,9 +37,34 @@ func Run(ctx context.Context, args []string) int {
 		return 1
 	}
 
+	cnf, err := config.Load(spec.ConfigPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "config: %v\n", err)
+		return 1
+	}
+
 	switch spec.Command {
 	case "init":
 		err = app.Init(ctx, spec.DSN)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "horus: %v\n", err)
+			return 0
+		}
+		fmt.Fprintf(os.Stdout, "Initialized")
+	case "analyze":
+		var layouts any
+		switch spec.Mode {
+		case "table":
+			layouts, err = app.AnalyzeTable(ctx, spec.DSN, spec.Flags["table"].(string), spec.Flags["record"].(bool))
+		case "survey":
+			layouts, err = app.AnalyzeSurvey(ctx, spec.DSN, spec.Flags["minrows"].(int64), spec.Flags["record"].(bool))
+		case "configured":
+			layouts, err = app.AnalyzeConfigured(ctx, spec.DSN, cnf, spec.Flags["record"].(bool))
+		}
+		// TEMP: raw dump until render.Layout exists - delete with it.
+		if err == nil {
+			fmt.Printf("%+v\n", layouts)
+		}
 	default:
 		err = fmt.Errorf("%s: not implemented yet", spec.Command)
 	}

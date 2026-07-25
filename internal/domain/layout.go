@@ -61,3 +61,11 @@ func (l PartitionLayout) CatchAll() (Partition, bool) {
 	}
 	return Partition{}, false
 }
+
+// InitResult is app.Init's report: which meta tables it created and
+// which already existed (derived from check-first catalog reads - DDL
+// itself reports nothing useful).
+type InitResult struct {
+	Created []string
+	Existed []string
+}

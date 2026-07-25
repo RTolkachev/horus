@@ -1,9 +1,10 @@
 // meta.go: the Meta facet - storage for horus's own tables.
 //
-// EnsureMetaSchema creates the horus schema, horus.journal, and
-// horus.stats if missing (idempotent; the init command is its only
-// caller, so elevated CREATE privileges are needed once, not on every
-// run); its CREATE TABLE text is the engine-specific part.
+// EnsureMetaSchema creates horus.journal and horus.stats if missing
+// (idempotent; the init command is its only caller). The horus database
+// itself is assumed to exist - provisioned out-of-band by a DBA - so the
+// app user needs only CREATE TABLE on that schema, never CREATE DATABASE;
+// its CREATE TABLE text is the engine-specific part.
 // MetaExec/MetaQuery pass portable, Horus-authored SQL through the shared
 // exec helper - they must never be pointed at target tables.
 package mysql
@@ -24,8 +25,6 @@ import (
 // stats: one row per table per observation; growth is derived from
 // watermark deltas between rows, never stored.
 var metaSchema = []string{
-	`CREATE DATABASE IF NOT EXISTS horus`,
-
 	`CREATE TABLE IF NOT EXISTS horus.journal (
 		id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 		table_name     VARCHAR(255)    NOT NULL,

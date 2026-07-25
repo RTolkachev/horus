@@ -6,8 +6,10 @@
 // Inventory is the ONLY component that observes the target server
 // (information_schema today; sys/performance_schema if a cross-check is
 // ever added). Everything downstream - planner, stats - works from its
-// snapshot. Read-only, stateless, no history, no judgments: it reports
-// facts; the planner raises the alarms.
+// snapshot, and it serves two callers: the configured maintenance cycle
+// (plan/run) and pre-config discovery (analyze), so its subjects need
+// not appear in any config. Read-only, stateless, no history, no
+// judgments: it reports facts; the planner raises the alarms.
 //
 // Allowed imports: internal/dbdriver, internal/domain.
 package inventory

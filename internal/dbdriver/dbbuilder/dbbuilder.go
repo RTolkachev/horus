@@ -19,6 +19,7 @@ import (
 // facets land, then disappears in favor of it.
 type Driver interface {
 	dbdriver.Meta
+	dbdriver.Inspector
 	Close() error
 }
 
@@ -32,9 +33,9 @@ func NewDriver() *DriverBuilder {
 	return &DriverBuilder{}
 }
 
-// DSN sets the connection string. A scheme prefix ("mysql://") selects
-// the engine unless Engine was called explicitly; a bare DSN defaults to
-// mysql.
+// DSN sets the connection string. The scheme prefix ("mysql://") is
+// mandatory and selects the engine - a bare DSN is rejected by Build,
+// never defaulted.
 func (b *DriverBuilder) DSN(dsn string) *DriverBuilder {
 	b.dsn = dsn
 	return b
