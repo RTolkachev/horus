@@ -25,6 +25,7 @@ import (
 
 	"github.com/RTolkachev/horus/internal/app"
 	"github.com/RTolkachev/horus/internal/config"
+	"github.com/RTolkachev/horus/internal/domain"
 )
 
 func Run(ctx context.Context, args []string) int {
@@ -52,7 +53,7 @@ func Run(ctx context.Context, args []string) int {
 		}
 		fmt.Fprintf(os.Stdout, "Initialized")
 	case "analyze":
-		var layouts any
+		var layouts []domain.PartitionLayout
 		switch spec.Mode {
 		case "table":
 			layouts, err = app.AnalyzeTable(ctx, spec.DSN, spec.Flags["table"].(string), spec.Flags["record"].(bool))
@@ -61,9 +62,13 @@ func Run(ctx context.Context, args []string) int {
 		case "configured":
 			layouts, err = app.AnalyzeConfigured(ctx, spec.DSN, cnf, spec.Flags["record"].(bool))
 		}
-		// TEMP: raw dump until render.Layout exists - delete with it.
-		if err == nil {
-			fmt.Printf("%+v\n", layouts)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "analyze: could not get layout")
+		}
+
+		err = renderLayouts(os.Stdout, layouts)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "analyze: could not render laout")
 		}
 	default:
 		err = fmt.Errorf("%s: not implemented yet", spec.Command)
