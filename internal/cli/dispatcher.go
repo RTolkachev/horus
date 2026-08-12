@@ -47,28 +47,21 @@ func Run(ctx context.Context, args []string) int {
 	switch spec.Command {
 	case "init":
 		err = app.Init(ctx, spec.DSN)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "horus: %v\n", err)
-			return 0
+		if err == nil {
+			fmt.Fprintln(os.Stdout, "Initialized")
 		}
-		fmt.Fprintf(os.Stdout, "Initialized")
 	case "analyze":
-		var layouts []domain.PartitionLayout
+		var tables []domain.Table
 		switch spec.Mode {
 		case "table":
-			layouts, err = app.AnalyzeTable(ctx, spec.DSN, spec.Flags["table"].(string), spec.Flags["record"].(bool))
+			tables, err = app.AnalyzeTable(ctx, spec.DSN, spec.Flags["table"].(string), spec.Flags["record"].(bool))
 		case "survey":
-			layouts, err = app.AnalyzeSurvey(ctx, spec.DSN, spec.Flags["minrows"].(int64), spec.Flags["record"].(bool))
+			tables, err = app.AnalyzeSurvey(ctx, spec.DSN, spec.Flags["minrows"].(int64), spec.Flags["record"].(bool))
 		case "configured":
-			layouts, err = app.AnalyzeConfigured(ctx, spec.DSN, cnf, spec.Flags["record"].(bool))
+			tables, err = app.AnalyzeConfigured(ctx, spec.DSN, cnf, spec.Flags["record"].(bool))
 		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "analyze: could not get layout")
-		}
-
-		err = renderLayouts(os.Stdout, layouts)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "analyze: could not render laout")
+		if err == nil {
+			err = renderTables(os.Stdout, tables)
 		}
 	default:
 		err = fmt.Errorf("%s: not implemented yet", spec.Command)

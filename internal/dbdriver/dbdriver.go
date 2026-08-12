@@ -47,13 +47,22 @@ type Driver interface {
 
 // Inspector reads catalog state. Inventory is its only caller.
 type Inspector interface {
-	// Layout returns the observed partition state of table, normalized:
-	// partitions in bound order, catch-all identification, approximate
-	// rows and bytes, and the ID watermark (AUTO_INCREMENT high-water
-	// mark), all captured in one pass. A configured-but-unpartitioned
-	// table is a valid observation, not an error
-	// (PartitionLayout.Partitioned == false).
-	Layout(ctx context.Context, table string) (domain.PartitionLayout, error)
+	// Layout returns the observed table with its partitioning facet
+	// populated: identity, watermark (AUTO_INCREMENT high-water mark),
+	// snapshot time, and partitions in bound order with catch-all
+	// identification and approximate rows/bytes, all captured in one
+	// pass. A configured-but-unpartitioned table is a valid observation,
+	// not an error (Table.Layout == nil). Sizes and the candidacy
+	// verdict are NOT populated here.
+	Layout(ctx context.Context, table string) (domain.Table, error)
+
+	// Profile is the deep observation for analyze/onboard: everything
+	// Layout returns, plus sizes/age and the engine's candidacy verdict
+	// (Table.Validation populated - blockers, warnings, candidate
+	// column). A blocked table is a successful observation whose verdict
+	// says so; error means the observation itself failed. The rules and
+	// the raw catalog facts they consume stay inside the engine package.
+	Profile(ctx context.Context, table string) (domain.Table, error)
 }
 
 // Querier reads table data. Two callers, two methods: boundary resolution

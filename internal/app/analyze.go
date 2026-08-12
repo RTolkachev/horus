@@ -26,7 +26,7 @@ import (
 type selection func(ctx context.Context, insp dbdriver.Inspector) ([]string, error)
 
 // AnalyzeTable observes a single named table.
-func AnalyzeTable(ctx context.Context, dsn, table string, record bool) ([]domain.PartitionLayout, error) {
+func AnalyzeTable(ctx context.Context, dsn, table string, record bool) ([]domain.Table, error) {
 	return analyze(ctx, dsn, record, func(ctx context.Context, insp dbdriver.Inspector) ([]string, error) {
 		return []string{table}, nil
 	})
@@ -35,7 +35,7 @@ func AnalyzeTable(ctx context.Context, dsn, table string, record bool) ([]domain
 // AnalyzeSurvey observes every table in the connected database with at
 // least minRows rows (approximate - catalog estimate). minRows 0 means
 // no filter.
-func AnalyzeSurvey(ctx context.Context, dsn string, minRows int64, record bool) ([]domain.PartitionLayout, error) {
+func AnalyzeSurvey(ctx context.Context, dsn string, minRows int64, record bool) ([]domain.Table, error) {
 	return analyze(ctx, dsn, record, func(ctx context.Context, insp dbdriver.Inspector) ([]string, error) {
 		// TODO(reggie): needs a catalog-listing method on the Inspector
 		// facet (information_schema.TABLES, WHERE TABLE_ROWS >= minRows
@@ -47,7 +47,7 @@ func AnalyzeSurvey(ctx context.Context, dsn string, minRows int64, record bool) 
 // AnalyzeConfigured observes the tables declared in the config entry
 // matching the connected database - the inspection view for tables
 // horus already manages.
-func AnalyzeConfigured(ctx context.Context, dsn string, config config.Config, record bool) ([]domain.PartitionLayout, error) {
+func AnalyzeConfigured(ctx context.Context, dsn string, config config.Config, record bool) ([]domain.Table, error) {
 	return analyze(ctx, dsn, record, func(ctx context.Context, insp dbdriver.Inspector) ([]string, error) {
 		// TODO(reggie): config.Load(configPath), then select the entry by
 		// the observed database (SELECT DATABASE() - needs a capability
@@ -59,7 +59,7 @@ func AnalyzeConfigured(ctx context.Context, dsn string, config config.Config, re
 // analyze is the shared spine: build the driver, hand the Inspector
 // facet to the selection and then to inventory per table, and persist
 // the snapshots via stats when record is set.
-func analyze(ctx context.Context, dsn string, record bool, sel selection) ([]domain.PartitionLayout, error) {
+func analyze(ctx context.Context, dsn string, record bool, sel selection) ([]domain.Table, error) {
 	drv, err := dbbuilder.NewDriver().DSN(dsn).Build()
 	if err != nil {
 		return nil, err
@@ -69,20 +69,15 @@ func analyze(ctx context.Context, dsn string, record bool, sel selection) ([]dom
 	if err != nil {
 		return nil, fmt.Errorf("analyze: could not get table selection")
 	}
-	partitions := make([]domain.PartitionLayout, len(list))
+	tables := make([]domain.Table, 0, len(list))
 	for _, tbl := range list {
-		partition, err := drv.Layout(ctx, tbl)
+		table, err := drv.Layout(ctx, tbl)
 		if err != nil {
 			return nil, fmt.Errorf("analyze: could not get partition layout")
 		}
-		partitions = append(partitions, partition)
+		tables = append(tables, table)
 	}
-	// TODO(reggie): dbbuilder.Driver exposes only Meta so far. Once
-	// mysql implements Inspector.Layout, widen dbbuilder.Driver with
-	// dbdriver.Inspector, then:
-	//   1. tables, err := sel(ctx, drv)
-	//   2. loop tables -> inventory.Layout(ctx, drv, name), collect
-	//   3. if record: stats.Record(ctx, drv, layouts) (Meta facet;
-	//      translate missing horus.stats into "run horus init first")
-	return partitions, nil
+	// TODO(reggie): if record: stats.Record(ctx, drv, tables) (Meta
+	// facet; translate missing horus.stats into "run horus init first").
+	return tables, nil
 }

@@ -15,34 +15,34 @@ import (
 	"github.com/RTolkachev/horus/internal/domain"
 )
 
-// renderLayouts prints one block per table, blank-line separated.
-func renderLayouts(w io.Writer, layouts []domain.PartitionLayout) error {
-	for i, l := range layouts {
+// renderTables prints one block per table, blank-line separated.
+func renderTables(w io.Writer, tables []domain.Table) error {
+	for i, t := range tables {
 		if i > 0 {
 			if _, err := fmt.Fprintln(w); err != nil {
 				return err
 			}
 		}
-		if err := renderLayout(w, l); err != nil {
+		if err := renderTable(w, t); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// renderLayout prints one table: a heading with the watermark and
+// renderTable prints one table: a heading with the watermark and
 // snapshot time, then the partitions in bound order.
-func renderLayout(w io.Writer, l domain.PartitionLayout) error {
-	if !l.Partitioned {
-		_, err := fmt.Fprintf(w, "%s: not partitioned\n", l.Table)
+func renderTable(w io.Writer, t domain.Table) error {
+	if !t.Partitioned() {
+		_, err := fmt.Fprintf(w, "%s: not partitioned\n", t.Name)
 		return err
 	}
 	_, err := fmt.Fprintf(w, "%s - watermark %d, observed %s\n",
-		l.Table, l.Watermark, l.TakenAt.Format("2006-01-02 15:04:05 MST"))
+		t.Name, t.Watermark, t.TakenAt.Format("2006-01-02 15:04:05 MST"))
 	if err != nil {
 		return err
 	}
-	t := table.New().
+	grid := table.New().
 		Border(lipgloss.NormalBorder()).
 		Headers("PARTITION", "LESS THAN", "~ROWS", "SIZE").
 		StyleFunc(func(row, col int) lipgloss.Style {
@@ -55,14 +55,10 @@ func renderLayout(w io.Writer, l domain.PartitionLayout) error {
 			}
 			return s
 		})
-	for _, p := range l.Partitions {
-		bound := strconv.FormatInt(p.UpperBound, 10)
-		if p.IsCatchAll {
-			bound = "MAXVALUE"
-		}
-		t.Row(p.Name, bound, strconv.FormatInt(p.ApproxRows, 10), humanBytes(p.Bytes))
+	for _, p := range t.Layout.Partitions {
+		grid.Row(p.Name, p.UpperBound.String(), strconv.FormatInt(p.ApproxRows, 10), humanBytes(p.Bytes))
 	}
-	_, err = fmt.Fprintln(w, t.Render())
+	_, err = fmt.Fprintln(w, grid.Render())
 	return err
 }
 

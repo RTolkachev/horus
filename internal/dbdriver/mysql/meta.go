@@ -25,30 +25,30 @@ import (
 // stats: one row per table per observation; growth is derived from
 // watermark deltas between rows, never stored.
 var metaSchema = []string{
-	`CREATE TABLE IF NOT EXISTS horus.journal (
-		id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-		table_name     VARCHAR(255)    NOT NULL,
-		action         VARCHAR(32)     NOT NULL,
-		partition_name VARCHAR(64)     NOT NULL,
-		upper_bound    BIGINT          NOT NULL,
-		status         ENUM('attempting','applied','already_applied','failed') NOT NULL,
-		error          TEXT            NULL,
-		started_at     DATETIME(6)     NOT NULL,
-		finished_at    DATETIME(6)     NULL,
-		PRIMARY KEY (id),
-		KEY by_table (table_name, id)
-	) ENGINE = InnoDB`,
+	`create table if not exists horus.journal (
+		id             bigint unsigned not null auto_increment,
+		table_name     varchar(255)    not null,
+		action         varchar(32)     not null,
+		partition_name varchar(64)     not null,
+		upper_bound    bigint          not null,
+		status         enum('attempting','applied','already_applied','failed') not null,
+		error          text            null,
+		started_at     datetime(6)     not null,
+		finished_at    datetime(6)     null,
+		primary key (id),
+		key by_table (table_name, id)
+	) engine = innodb`,
 
-	`CREATE TABLE IF NOT EXISTS horus.stats (
-		id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-		table_name  VARCHAR(255)    NOT NULL,
-		taken_at    DATETIME(6)     NOT NULL,
-		watermark   BIGINT          NOT NULL,
-		approx_rows BIGINT          NOT NULL,
-		bytes       BIGINT          NOT NULL,
-		PRIMARY KEY (id),
-		KEY by_table_time (table_name, taken_at)
-	) ENGINE = InnoDB`,
+	`create table if not exists horus.stats (
+		id          bigint unsigned not null auto_increment,
+		table_name  varchar(255)    not null,
+		taken_at    datetime(6)     not null,
+		watermark   bigint          not null,
+		approx_rows bigint          not null,
+		bytes       bigint          not null,
+		primary key (id),
+		key by_table_time (table_name, taken_at)
+	) engine = innodb`,
 }
 
 func (d *Driver) EnsureMetaSchema(ctx context.Context) error {
